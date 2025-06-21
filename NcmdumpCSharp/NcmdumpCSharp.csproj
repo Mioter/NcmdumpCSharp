@@ -17,4 +17,12 @@
     <PackageReference Include="z440.atl.core" Version="6.26.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="..\README.md">
+      <Pack>true</Pack>
+      <PackagePath>\</PackagePath>
+      <Link>README.md</Link>
+    </None>
+  </ItemGroup>
+
 </Project> 

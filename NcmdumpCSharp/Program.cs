@@ -51,7 +51,7 @@ internal static class Program
     static void ProcessFiles(string? directory, bool recursive, string? output, string[] files)
     {
         // 检查参数
-        if (string.IsNullOrEmpty(directory) && (files.Length == 0))
+        if (string.IsNullOrEmpty(directory) && files.Length == 0)
         {
             Console.WriteLine("错误: 请指定要处理的文件或目录");
             Console.WriteLine("使用 --help 查看帮助信息");

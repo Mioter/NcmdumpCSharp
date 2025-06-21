@@ -12,43 +12,9 @@ public class NeteaseCrypt : IDisposable
 {
     // 固定的密钥
     private static readonly byte[] _coreKey =
-    [
-        0x68,
-        0x7A,
-        0x48,
-        0x52,
-        0x41,
-        0x6D,
-        0x73,
-        0x6F,
-        0x35,
-        0x6B,
-        0x49,
-        0x6E,
-        0x62,
-        0x61,
-        0x78,
-        0x57,
-    ];
+    "hzHRAmso5kInbaxW"u8.ToArray();
     private static readonly byte[] _modifyKey =
-    [
-        0x23,
-        0x31,
-        0x34,
-        0x6C,
-        0x6A,
-        0x6B,
-        0x5F,
-        0x21,
-        0x5C,
-        0x5D,
-        0x26,
-        0x30,
-        0x55,
-        0x3C,
-        0x27,
-        0x28,
-    ];
+    "#14ljk_!\\]&0U<\'("u8.ToArray();
     private static readonly byte[] _pngHeader = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
 
     private readonly string _filePath;
@@ -277,8 +243,8 @@ public class NeteaseCrypt : IDisposable
                 // RC4解密
                 for (int i = 0; i < bytesRead; i++)
                 {
-                    int j = (int)((position + i + 1) & 0xff);
-                    buffer[i] ^= _keyBox[(_keyBox[j] + _keyBox[(_keyBox[j] + j) & 0xff]) & 0xff];
+                    int j = (int)(position + i + 1 & 0xff);
+                    buffer[i] ^= _keyBox[_keyBox[j] + _keyBox[_keyBox[j] + j & 0xff] & 0xff];
                 }
 
                 // 确定文件格式
@@ -372,8 +338,8 @@ public class NeteaseCrypt : IDisposable
             // RC4解密
             for (int i = 0; i < bytesRead; i++)
             {
-                int j = (int)((position + i + 1) & 0xff);
-                buffer[i] ^= _keyBox[(_keyBox[j] + _keyBox[(_keyBox[j] + j) & 0xff]) & 0xff];
+                int j = (int)(position + i + 1 & 0xff);
+                buffer[i] ^= _keyBox[_keyBox[j] + _keyBox[_keyBox[j] + j & 0xff] & 0xff];
             }
             
             if (firstChunk)
@@ -392,7 +358,7 @@ public class NeteaseCrypt : IDisposable
                 firstChunk = false;
             }
 
-            await memoryStream.WriteAsync(buffer, 0, bytesRead);
+            await memoryStream.WriteAsync(buffer.AsMemory(0, bytesRead));
             position += bytesRead;
         }
 

@@ -158,4 +158,4 @@ NcmdumpCSharp/
 ## 致谢
 
 - 感谢原C++版本的开发者 [taurusxin/ncmdump](https://github.com/taurusxin/ncmdump)
-- 感谢TagLib#项目提供的音频元数据处理功能 
+- 感谢 [atldotnet](https://github.com/Zeugma440/atldotnet) 项目提供的音频元数据处理功能 

@@ -41,7 +41,7 @@ dotnet publish -c Release -r win-x64 --self-contained true
 
 ### 下载预编译版本
 
-从 [Releases](https://github.com/your-repo/NcmdumpCSharp/releases) 页面下载对应平台的预编译版本。
+从 [Releases](https://github.com/Mioter/NcmdumpCSharp/releases) 页面下载对应平台的预编译版本，不过并没有预编译的版本...
 
 ## 使用方法
 

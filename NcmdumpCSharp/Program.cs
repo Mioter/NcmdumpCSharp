@@ -11,44 +11,57 @@ internal static class Program
 
         // 目录选项
         var directoryOption = new Option<string?>(
-            aliases: ["-d", "--directory"],
-            description: "处理指定目录下的所有NCM文件"
-        );
-        rootCommand.AddOption(directoryOption);
+            "--directory",
+            "-d"
+        )
+        {
+            Description = "处理指定目录下的所有NCM文件"
+        };
+        rootCommand.Options.Add(directoryOption);
 
         // 递归选项
         var recursiveOption = new Option<bool>(
-            aliases: ["-r", "--recursive"],
-            description: "递归处理子目录"
-        );
-        rootCommand.AddOption(recursiveOption);
+            "--recursive",
+            "-r"
+        )
+        {
+            Description = "递归处理子目录"
+        };
+        rootCommand.Options.Add(recursiveOption);
 
         // 输出目录选项
         var outputOption = new Option<string?>(
-            aliases: ["-o", "--output"],
-            description: "指定输出目录"
-        );
-        rootCommand.AddOption(outputOption);
+            "--output",
+            "-o"
+        )
+        {
+            Description = "指定输出目录"
+        };
+        rootCommand.Options.Add(outputOption);
 
         // 文件参数
-        var filesArgument = new Argument<string[]>("files", "要处理的NCM文件")
+        var filesArgument = new Argument<string[]>("files")
         {
+            Description = "要处理的NCM文件",
             Arity = ArgumentArity.ZeroOrMore,
         };
-        rootCommand.AddArgument(filesArgument);
+        rootCommand.Arguments.Add(filesArgument);
 
-        rootCommand.SetHandler(
-            ProcessFiles,
-            directoryOption,
-            recursiveOption,
-            outputOption,
-            filesArgument
-        );
+        rootCommand.SetAction((ParseResult parseResult) =>
+        {
+            string? directory = parseResult.GetValue(directoryOption);
+            bool recursive = parseResult.GetValue(recursiveOption);
+            string? output = parseResult.GetValue(outputOption);
+            string[] files = parseResult.GetValue(filesArgument) ?? [];
+            
+            ProcessFiles(directory, recursive, output, files);
+            return 0;
+        });
 
-        return await rootCommand.InvokeAsync(args);
+        return await rootCommand.Parse(args).InvokeAsync();
     }
 
-    static void ProcessFiles(string? directory, bool recursive, string? output, string[] files)
+    private static void ProcessFiles(string? directory, bool recursive, string? output, string[] files)
     {
         // 检查参数
         if (string.IsNullOrEmpty(directory) && files.Length == 0)
@@ -145,7 +158,7 @@ internal static class Program
         }
     }
 
-    static void ProcessSingleFile(string filePath, string outputDir)
+    private static void ProcessSingleFile(string filePath, string outputDir)
     {
         // 跳过非NCM文件
         if (!filePath.EndsWith(".ncm", StringComparison.OrdinalIgnoreCase))

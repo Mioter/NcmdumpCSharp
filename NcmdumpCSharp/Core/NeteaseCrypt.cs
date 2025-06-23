@@ -11,21 +11,17 @@ namespace NcmdumpCSharp.Core;
 public class NeteaseCrypt : IDisposable
 {
     // 固定的密钥
-    private static readonly byte[] _coreKey =
-    "hzHRAmso5kInbaxW"u8.ToArray();
-    private static readonly byte[] _modifyKey =
-    "#14ljk_!\\]&0U<\'("u8.ToArray();
+    private static readonly byte[] _coreKey = "hzHRAmso5kInbaxW"u8.ToArray();
+    private static readonly byte[] _modifyKey = "#14ljk_!\\]&0U<\'("u8.ToArray();
     private static readonly byte[] _pngHeader = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
 
     private readonly string _filePath;
     private FileStream? _fileStream;
     private readonly byte[] _keyBox = new byte[256];
-    private NeteaseMusicMetadata? _metadata;
-    private byte[]? _imageData;
-    private string _dumpFilePath = string.Empty;
 
-    public NeteaseMusicMetadata? Metadata => _metadata;
-    public byte[]? ImageData => _imageData;
+    public NeteaseMusicMetadata? Metadata { get; private set; }
+
+    public byte[]? ImageData { get; private set; }
 
     /// <summary>
     /// 构造函数
@@ -40,7 +36,7 @@ public class NeteaseCrypt : IDisposable
     /// <summary>
     /// 获取输出文件路径
     /// </summary>
-    public string DumpFilePath => _dumpFilePath;
+    public string DumpFilePath { get; private set; } = string.Empty;
 
     /// <summary>
     /// 初始化解密器
@@ -110,13 +106,9 @@ public class NeteaseCrypt : IDisposable
             byte[] modifyDecryptData = AesHelper.AesEcbDecrypt(_modifyKey, modifyOutData);
 
             // 跳过"music:"
-            string jsonData = Encoding.UTF8.GetString(
-                modifyDecryptData,
-                6,
-                modifyDecryptData.Length - 6
-            );
+            string jsonData = Encoding.UTF8.GetString(modifyDecryptData, 6, modifyDecryptData.Length - 6);
 
-            _metadata = NeteaseMusicMetadata.FromJson(jsonData);
+            Metadata = NeteaseMusicMetadata.FromJson(jsonData);
         }
 
         // 跳过CRC32和图片版本
@@ -128,8 +120,8 @@ public class NeteaseCrypt : IDisposable
 
         if (imageLength > 0)
         {
-            _imageData = new byte[imageLength];
-            ReadBytes(_imageData, 0, imageLength);
+            ImageData = new byte[imageLength];
+            ReadBytes(ImageData, 0, imageLength);
         }
 
         // 跳过剩余的封面数据
@@ -220,12 +212,12 @@ public class NeteaseCrypt : IDisposable
     {
         if (string.IsNullOrEmpty(outputDir))
         {
-            _dumpFilePath = Path.ChangeExtension(_filePath, null);
+            DumpFilePath = Path.ChangeExtension(_filePath, null);
         }
         else
         {
             string fileName = Path.GetFileNameWithoutExtension(_filePath);
-            _dumpFilePath = Path.Combine(outputDir, fileName);
+            DumpFilePath = Path.Combine(outputDir, fileName);
         }
 
         byte[] buffer = new byte[0x8000];
@@ -252,21 +244,21 @@ public class NeteaseCrypt : IDisposable
                 {
                     if (buffer[0] == 0x49 && buffer[1] == 0x44 && buffer[2] == 0x33)
                     {
-                        _dumpFilePath = Path.ChangeExtension(_dumpFilePath, "mp3");
+                        DumpFilePath = Path.ChangeExtension(DumpFilePath, "mp3");
                     }
                     else
                     {
-                        _dumpFilePath = Path.ChangeExtension(_dumpFilePath, "flac");
+                        DumpFilePath = Path.ChangeExtension(DumpFilePath, "flac");
                     }
 
                     // 确保输出目录存在
-                    string? outputDir2 = Path.GetDirectoryName(_dumpFilePath);
+                    string? outputDir2 = Path.GetDirectoryName(DumpFilePath);
                     if (!string.IsNullOrEmpty(outputDir2) && !Directory.Exists(outputDir2))
                     {
                         Directory.CreateDirectory(outputDir2);
                     }
 
-                    outputStream = File.Create(_dumpFilePath);
+                    outputStream = File.Create(DumpFilePath);
                 }
 
                 outputStream.Write(buffer, 0, bytesRead);
@@ -284,25 +276,25 @@ public class NeteaseCrypt : IDisposable
     /// </summary>
     public void FixMetadata()
     {
-        if (string.IsNullOrEmpty(_dumpFilePath) || !File.Exists(_dumpFilePath))
+        if (string.IsNullOrEmpty(DumpFilePath) || !File.Exists(DumpFilePath))
         {
             throw new InvalidOperationException("输出文件不存在");
         }
 
         try
         {
-            var tag = new Track(_dumpFilePath);
+            var tag = new Track(DumpFilePath);
 
-            if (_metadata == null)
+            if (Metadata == null)
                 return;
-            tag.Title = _metadata.Name;
-            tag.Artist = _metadata.Artist;
-            tag.Album = _metadata.Album;
+            tag.Title = Metadata.Name;
+            tag.Artist = Metadata.Artist;
+            tag.Album = Metadata.Album;
 
             // 添加封面图片
-            if (_imageData is { Length: > 0 })
+            if (ImageData is { Length: > 0 })
             {
-                var picture = PictureInfo.fromBinaryData(_imageData, PictureInfo.PIC_TYPE.Front);
+                var picture = PictureInfo.fromBinaryData(ImageData, PictureInfo.PIC_TYPE.Front);
                 tag.EmbeddedPictures.Clear(); // 可选：清空已有封面
                 tag.EmbeddedPictures.Add(picture);
             }
@@ -329,7 +321,7 @@ public class NeteaseCrypt : IDisposable
         var memoryStream = new MemoryStream();
         byte[] buffer = new byte[0x8000];
         int bytesRead;
-        string? format = _metadata?.Format;
+        string? format = Metadata?.Format;
         bool firstChunk = true;
         long position = 0;
 
@@ -341,12 +333,18 @@ public class NeteaseCrypt : IDisposable
                 int j = (int)(position + i + 1 & 0xff);
                 buffer[i] ^= _keyBox[_keyBox[j] + _keyBox[_keyBox[j] + j & 0xff] & 0xff];
             }
-            
+
             if (firstChunk)
             {
                 if (string.IsNullOrEmpty(format))
                 {
-                    if (bytesRead >= 4 && buffer[0] == 0x66 && buffer[1] == 0x4C && buffer[2] == 0x61 && buffer[3] == 0x43) // fLaC
+                    if (
+                        bytesRead >= 4
+                        && buffer[0] == 0x66
+                        && buffer[1] == 0x4C
+                        && buffer[2] == 0x61
+                        && buffer[3] == 0x43
+                    ) // fLaC
                     {
                         format = "flac";
                     }

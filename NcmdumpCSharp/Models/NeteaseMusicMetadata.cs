@@ -45,10 +45,7 @@ public class NeteaseMusicMetadata
                     var artists = new List<string>();
                     foreach (var artistItem in artist.EnumerateArray())
                     {
-                        if (
-                            artistItem.ValueKind == JsonValueKind.Array
-                            && artistItem.GetArrayLength() > 0
-                        )
+                        if (artistItem.ValueKind == JsonValueKind.Array && artistItem.GetArrayLength() > 0)
                         {
                             var firstArtist = artistItem[0];
                             if (firstArtist.ValueKind == JsonValueKind.String)

@@ -10,33 +10,15 @@ internal static class Program
         var rootCommand = new RootCommand("网易云音乐NCM文件解密工具 - C#版本");
 
         // 目录选项
-        var directoryOption = new Option<string?>(
-            "--directory",
-            "-d"
-        )
-        {
-            Description = "处理指定目录下的所有NCM文件"
-        };
+        var directoryOption = new Option<string?>("--directory", "-d") { Description = "处理指定目录下的所有NCM文件" };
         rootCommand.Options.Add(directoryOption);
 
         // 递归选项
-        var recursiveOption = new Option<bool>(
-            "--recursive",
-            "-r"
-        )
-        {
-            Description = "递归处理子目录"
-        };
+        var recursiveOption = new Option<bool>("--recursive", "-r") { Description = "递归处理子目录" };
         rootCommand.Options.Add(recursiveOption);
 
         // 输出目录选项
-        var outputOption = new Option<string?>(
-            "--output",
-            "-o"
-        )
-        {
-            Description = "指定输出目录"
-        };
+        var outputOption = new Option<string?>("--output", "-o") { Description = "指定输出目录" };
         rootCommand.Options.Add(outputOption);
 
         // 文件参数
@@ -47,16 +29,18 @@ internal static class Program
         };
         rootCommand.Arguments.Add(filesArgument);
 
-        rootCommand.SetAction((ParseResult parseResult) =>
-        {
-            string? directory = parseResult.GetValue(directoryOption);
-            bool recursive = parseResult.GetValue(recursiveOption);
-            string? output = parseResult.GetValue(outputOption);
-            string[] files = parseResult.GetValue(filesArgument) ?? [];
-            
-            ProcessFiles(directory, recursive, output, files);
-            return 0;
-        });
+        rootCommand.SetAction(
+            (ParseResult parseResult) =>
+            {
+                string? directory = parseResult.GetValue(directoryOption);
+                bool recursive = parseResult.GetValue(recursiveOption);
+                string? output = parseResult.GetValue(outputOption);
+                string[] files = parseResult.GetValue(filesArgument) ?? [];
+
+                ProcessFiles(directory, recursive, output, files);
+                return 0;
+            }
+        );
 
         return await rootCommand.Parse(args).InvokeAsync();
     }
@@ -107,11 +91,7 @@ internal static class Program
                 if (recursive)
                 {
                     // 递归处理
-                    string[] allFiles = Directory.GetFiles(
-                        directory,
-                        "*.ncm",
-                        SearchOption.AllDirectories
-                    );
+                    string[] allFiles = Directory.GetFiles(directory, "*.ncm", SearchOption.AllDirectories);
                     foreach (string file in allFiles)
                     {
                         string relativePath = Path.GetRelativePath(directory, file);

@@ -42,18 +42,15 @@ public class NeteaseMusicMetadata
             {
                 if (artist.ValueKind == JsonValueKind.Array)
                 {
-                    var artists = new List<string>();
-                    foreach (var artistItem in artist.EnumerateArray())
-                    {
-                        if (artistItem.ValueKind == JsonValueKind.Array && artistItem.GetArrayLength() > 0)
-                        {
-                            var firstArtist = artistItem[0];
-                            if (firstArtist.ValueKind == JsonValueKind.String)
-                            {
-                                artists.Add(firstArtist.GetString() ?? string.Empty);
-                            }
-                        }
-                    }
+                    var artists = artist
+                        .EnumerateArray()
+                        .Where(artistItem =>
+                            artistItem.ValueKind == JsonValueKind.Array && artistItem.GetArrayLength() > 0
+                        )
+                        .Select(artistItem => artistItem[0])
+                        .Where(firstArtist => firstArtist.ValueKind == JsonValueKind.String)
+                        .Select(firstArtist => firstArtist.GetString() ?? string.Empty)
+                        .ToList();
                     metadata.Artist = string.Join("/", artists);
                 }
             }

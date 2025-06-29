@@ -1,3 +1,5 @@
+using System.Text;
+
 namespace NcmdumpCSharp.Crypto;
 
 /// <summary>
@@ -23,6 +25,6 @@ public static class Base64Helper
     public static string DecodeToString(string base64String)
     {
         byte[] bytes = Decode(base64String);
-        return System.Text.Encoding.UTF8.GetString(bytes);
+        return Encoding.UTF8.GetString(bytes);
     }
 }

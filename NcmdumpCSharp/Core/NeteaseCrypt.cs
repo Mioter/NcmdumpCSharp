@@ -325,7 +325,7 @@ public class NeteaseCrypt : IDisposable
         bool firstChunk = true;
         long position = 0;
 
-        while ((bytesRead = await _fileStream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+        while ((bytesRead = await _fileStream.ReadAsync(buffer)) > 0)
         {
             // RC4解密
             for (int i = 0; i < bytesRead; i++)
@@ -370,5 +370,6 @@ public class NeteaseCrypt : IDisposable
     public void Dispose()
     {
         _fileStream?.Dispose();
+        GC.SuppressFinalize(this);
     }
 }

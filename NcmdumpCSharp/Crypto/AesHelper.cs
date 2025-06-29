@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Text;
 
 namespace NcmdumpCSharp.Crypto;
 
@@ -32,8 +33,8 @@ public static class AesHelper
     /// <returns>解密后的字符串</returns>
     public static string AesEcbDecrypt(byte[] key, string encryptedString)
     {
-        byte[] encryptedData = System.Text.Encoding.UTF8.GetBytes(encryptedString);
+        byte[] encryptedData = Encoding.UTF8.GetBytes(encryptedString);
         byte[] decryptedData = AesEcbDecrypt(key, encryptedData);
-        return System.Text.Encoding.UTF8.GetString(decryptedData);
+        return Encoding.UTF8.GetString(decryptedData);
     }
 }

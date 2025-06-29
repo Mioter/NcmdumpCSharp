@@ -29,18 +29,16 @@ internal static class Program
         };
         rootCommand.Arguments.Add(filesArgument);
 
-        rootCommand.SetAction(
-            (ParseResult parseResult) =>
-            {
-                string? directory = parseResult.GetValue(directoryOption);
-                bool recursive = parseResult.GetValue(recursiveOption);
-                string? output = parseResult.GetValue(outputOption);
-                string[] files = parseResult.GetValue(filesArgument) ?? [];
+        rootCommand.SetAction(parseResult =>
+        {
+            string? directory = parseResult.GetValue(directoryOption);
+            bool recursive = parseResult.GetValue(recursiveOption);
+            string? output = parseResult.GetValue(outputOption);
+            string[] files = parseResult.GetValue(filesArgument) ?? [];
 
-                ProcessFiles(directory, recursive, output, files);
-                return 0;
-            }
-        );
+            ProcessFiles(directory, recursive, output, files);
+            return 0;
+        });
 
         return await rootCommand.Parse(args).InvokeAsync();
     }

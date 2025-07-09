@@ -36,6 +36,9 @@ internal static class Program
             string? output = parseResult.GetValue(outputOption);
             string[] files = parseResult.GetValue(filesArgument) ?? [];
 
+            if (output == null) 
+                return -1;
+            
             ProcessFiles(directory, recursive, output, files);
             return 0;
         });
@@ -43,7 +46,7 @@ internal static class Program
         return await rootCommand.Parse(args).InvokeAsync();
     }
 
-    private static void ProcessFiles(string? directory, bool recursive, string? output, string[] files)
+    private static void ProcessFiles(string? directory, bool recursive, string output, string[] files)
     {
         // 检查参数
         if (string.IsNullOrEmpty(directory) && files.Length == 0)
@@ -66,7 +69,7 @@ internal static class Program
 
         if (outputDirSpecified)
         {
-            outputDir = output!;
+            outputDir = output;
             if (File.Exists(outputDir))
             {
                 Console.WriteLine($"错误: '{outputDir}' 不是一个有效的目录");

@@ -226,7 +226,7 @@ public class NeteaseCrypt : IDisposable
 
         try
         {
-            while (_fileStream!.Position < _fileStream.Length)
+            while (_fileStream != null && _fileStream.Position < _fileStream.Length)
             {
                 int bytesRead = _fileStream.Read(buffer, 0, buffer.Length);
                 if (bytesRead == 0)

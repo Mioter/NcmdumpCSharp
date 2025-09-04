@@ -6,7 +6,7 @@ using NcmdumpCSharp.Models;
 namespace NcmdumpCSharp.Core;
 
 /// <summary>
-/// 网易云音乐NCM文件解密器
+///     网易云音乐NCM文件解密器
 /// </summary>
 public class NeteaseCrypt : IDisposable
 {
@@ -16,15 +16,11 @@ public class NeteaseCrypt : IDisposable
     private static readonly byte[] _pngHeader = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
 
     private readonly string _filePath;
-    private FileStream? _fileStream;
     private readonly byte[] _keyBox = new byte[256];
-
-    public NeteaseMusicMetadata? Metadata { get; private set; }
-
-    public byte[]? ImageData { get; private set; }
+    private FileStream? _fileStream;
 
     /// <summary>
-    /// 构造函数
+    ///     构造函数
     /// </summary>
     /// <param name="filePath">NCM文件路径</param>
     public NeteaseCrypt(string filePath)
@@ -33,13 +29,26 @@ public class NeteaseCrypt : IDisposable
         Initialize();
     }
 
+    public NeteaseMusicMetadata? Metadata { get; private set; }
+
+    public byte[]? ImageData { get; private set; }
+
     /// <summary>
-    /// 获取输出文件路径
+    ///     获取输出文件路径
     /// </summary>
     public string DumpFilePath { get; private set; } = string.Empty;
 
     /// <summary>
-    /// 初始化解密器
+    ///     释放资源
+    /// </summary>
+    public void Dispose()
+    {
+        _fileStream?.Dispose();
+        GC.SuppressFinalize(this);
+    }
+
+    /// <summary>
+    ///     初始化解密器
     /// </summary>
     private void Initialize()
     {
@@ -60,6 +69,7 @@ public class NeteaseCrypt : IDisposable
 
         // 读取密钥数据长度
         int keyDataLength = ReadInt32();
+
         if (keyDataLength <= 0)
         {
             throw new InvalidOperationException("损坏的NCM文件");
@@ -129,7 +139,7 @@ public class NeteaseCrypt : IDisposable
     }
 
     /// <summary>
-    /// 检查是否为NCM文件
+    ///     检查是否为NCM文件
     /// </summary>
     private bool IsNcmFile()
     {
@@ -140,7 +150,7 @@ public class NeteaseCrypt : IDisposable
     }
 
     /// <summary>
-    /// 构建密钥盒
+    ///     构建密钥盒
     /// </summary>
     private void BuildKeyBox(byte[] key, int keyOffset, int keyLength)
     {
@@ -158,6 +168,7 @@ public class NeteaseCrypt : IDisposable
             byte swap = _keyBox[i];
             byte c = (byte)(swap + lastByte + key[keyOffset + keyOffset2] & 0xff);
             keyOffset2++;
+
             if (keyOffset2 >= keyLength)
                 keyOffset2 = 0;
 
@@ -168,17 +179,18 @@ public class NeteaseCrypt : IDisposable
     }
 
     /// <summary>
-    /// 读取4字节整数
+    ///     读取4字节整数
     /// </summary>
     private int ReadInt32()
     {
         byte[] buffer = new byte[4];
         ReadBytes(buffer, 0, 4);
+
         return BitConverter.ToInt32(buffer, 0);
     }
 
     /// <summary>
-    /// 读取字节数组
+    ///     读取字节数组
     /// </summary>
     private void ReadBytes(byte[] buffer, int offset, int count)
     {
@@ -186,6 +198,7 @@ public class NeteaseCrypt : IDisposable
             throw new InvalidOperationException("文件流未初始化");
 
         int bytesRead = _fileStream.Read(buffer, offset, count);
+
         if (bytesRead != count)
         {
             throw new InvalidOperationException("读取文件失败");
@@ -193,7 +206,7 @@ public class NeteaseCrypt : IDisposable
     }
 
     /// <summary>
-    /// 获取MIME类型
+    ///     获取MIME类型
     /// </summary>
     private static string GetMimeType(byte[] data)
     {
@@ -201,11 +214,12 @@ public class NeteaseCrypt : IDisposable
         {
             return "image/png";
         }
+
         return "image/jpeg";
     }
 
     /// <summary>
-    /// 解密并保存文件
+    ///     解密并保存文件
     /// </summary>
     /// <param name="outputDir">输出目录</param>
     public void Dump(string outputDir = "")
@@ -229,6 +243,7 @@ public class NeteaseCrypt : IDisposable
             while (_fileStream != null && _fileStream.Position < _fileStream.Length)
             {
                 int bytesRead = _fileStream.Read(buffer, 0, buffer.Length);
+
                 if (bytesRead == 0)
                     break;
 
@@ -253,6 +268,7 @@ public class NeteaseCrypt : IDisposable
 
                     // 确保输出目录存在
                     string? outputDir2 = Path.GetDirectoryName(DumpFilePath);
+
                     if (!string.IsNullOrEmpty(outputDir2) && !Directory.Exists(outputDir2))
                     {
                         Directory.CreateDirectory(outputDir2);
@@ -272,7 +288,7 @@ public class NeteaseCrypt : IDisposable
     }
 
     /// <summary>
-    /// 修复元数据
+    ///     修复元数据
     /// </summary>
     public void FixMetadata()
     {
@@ -287,6 +303,7 @@ public class NeteaseCrypt : IDisposable
 
             if (Metadata == null)
                 return;
+
             tag.Title = Metadata.Name;
             tag.Artist = Metadata.Artist;
             tag.Album = Metadata.Album;
@@ -308,14 +325,14 @@ public class NeteaseCrypt : IDisposable
     }
 
     /// <summary>
-    /// 解密音频数据到内存流
+    ///     解密音频数据到内存流
     /// </summary>
     /// <returns>包含音频流、元数据、封面图片和格式的元组</returns>
-    public async Task<(MemoryStream? AudioStream, string? Format)> DumpToStreamAsync()
+    public async Task<MemoryStream?> DumpToStreamAsync()
     {
         if (_fileStream == null)
         {
-            return (null, null);
+            return null;
         }
 
         var memoryStream = new MemoryStream();
@@ -340,19 +357,20 @@ public class NeteaseCrypt : IDisposable
                 {
                     if (
                         bytesRead >= 4
-                        && buffer[0] == 0x66
-                        && buffer[1] == 0x4C
-                        && buffer[2] == 0x61
-                        && buffer[3] == 0x43
+                     && buffer[0] == 0x66
+                     && buffer[1] == 0x4C
+                     && buffer[2] == 0x61
+                     && buffer[3] == 0x43
                     ) // fLaC
                     {
-                        format = "flac";
+                        Metadata?.Format = "flac";
                     }
                     else if (bytesRead >= 3 && buffer[0] == 0x49 && buffer[1] == 0x44 && buffer[2] == 0x33) // ID3
                     {
-                        format = "mp3";
+                        Metadata?.Format = "mp3";
                     }
                 }
+
                 firstChunk = false;
             }
 
@@ -361,15 +379,7 @@ public class NeteaseCrypt : IDisposable
         }
 
         memoryStream.Position = 0;
-        return (memoryStream, format);
-    }
 
-    /// <summary>
-    /// 释放资源
-    /// </summary>
-    public void Dispose()
-    {
-        _fileStream?.Dispose();
-        GC.SuppressFinalize(this);
+        return memoryStream;
     }
 }

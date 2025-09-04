@@ -1,27 +1,27 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-    <AssemblyTitle>NcmdumpCSharp</AssemblyTitle>
-    <AssemblyDescription>网易云音乐NCM文件解密工具 - C#版本</AssemblyDescription>
-    <AssemblyVersion>1.0.0.0</AssemblyVersion>
-    <FileVersion>1.0.0.0</FileVersion>
-    <LangVersion>preview</LangVersion>
-  </PropertyGroup>
+    <PropertyGroup>
+        <TargetFramework>net9.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <AssemblyTitle>NcmdumpCSharp</AssemblyTitle>
+        <AssemblyDescription>网易云音乐NCM文件解密工具 - C#版本</AssemblyDescription>
+        <AssemblyVersion>1.0.0.0</AssemblyVersion>
+        <FileVersion>1.0.0.0</FileVersion>
+        <LangVersion>preview</LangVersion>
+    </PropertyGroup>
 
-  <ItemGroup>
-    <PackageReference Include="System.CommandLine" Version="2.0.0-beta7.25380.108" />
-    <PackageReference Include="z440.atl.core" Version="7.3.0" />
-  </ItemGroup>
+    <ItemGroup>
+        <PackageReference Include="System.CommandLine" Version="2.0.0-beta7.25380.108"/>
+        <PackageReference Include="z440.atl.core" Version="7.3.0"/>
+    </ItemGroup>
 
-  <ItemGroup>
-    <None Include="..\README.md">
-      <Pack>true</Pack>
-      <PackagePath>\</PackagePath>
-      <Link>README.md</Link>
-    </None>
-  </ItemGroup>
+    <ItemGroup>
+        <None Include="..\README.md">
+            <Pack>true</Pack>
+            <PackagePath>\</PackagePath>
+            <Link>README.md</Link>
+        </None>
+    </ItemGroup>
 
 </Project> 

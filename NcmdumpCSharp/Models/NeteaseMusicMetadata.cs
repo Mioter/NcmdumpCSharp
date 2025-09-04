@@ -3,19 +3,24 @@ using System.Text.Json;
 namespace NcmdumpCSharp.Models;
 
 /// <summary>
-/// 网易云音乐元数据
+///     网易云音乐元数据
 /// </summary>
 public class NeteaseMusicMetadata
 {
     public string Name { get; set; } = string.Empty;
+
     public string Album { get; set; } = string.Empty;
+
     public string Artist { get; set; } = string.Empty;
+
     public string Format { get; set; } = string.Empty;
+
     public int Duration { get; set; }
+
     public int Bitrate { get; set; }
 
     /// <summary>
-    /// 从JSON字符串解析元数据
+    ///     从JSON字符串解析元数据
     /// </summary>
     /// <param name="jsonString">JSON字符串</param>
     /// <returns>元数据对象</returns>
@@ -51,6 +56,7 @@ public class NeteaseMusicMetadata
                         .Where(firstArtist => firstArtist.ValueKind == JsonValueKind.String)
                         .Select(firstArtist => firstArtist.GetString() ?? string.Empty)
                         .ToList();
+
                     metadata.Artist = string.Join("/", artists);
                 }
             }

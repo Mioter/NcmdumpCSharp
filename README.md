@@ -50,36 +50,43 @@ dotnet publish -c Release -r win-x64 --self-contained true
 注意 : `ncmdump-csharp`请替换为实际可执行文件名！
 
 显示帮助信息：
+
 ```bash
 ncmdump-csharp --help
 ```
 
 显示版本信息：
+
 ```bash
 ncmdump-csharp --version
 ```
 
 处理单个或多个文件：
+
 ```bash
 ncmdump-csharp file1.ncm file2.ncm file3.ncm
 ```
 
 处理指定目录下的所有NCM文件：
+
 ```bash
 ncmdump-csharp -d /path/to/music/folder
 ```
 
 递归处理目录及其子目录：
+
 ```bash
 ncmdump-csharp -d /path/to/music/folder -r
 ```
 
 指定输出目录：
+
 ```bash
 ncmdump-csharp file1.ncm file2.ncm -o /path/to/output
 ```
 
 组合使用：
+
 ```bash
 ncmdump-csharp -d /path/to/music/folder -r -o /path/to/output
 ```

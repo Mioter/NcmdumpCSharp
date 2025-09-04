@@ -4,12 +4,12 @@ using System.Text;
 namespace NcmdumpCSharp.Crypto;
 
 /// <summary>
-/// AES解密辅助类
+///     AES解密辅助类
 /// </summary>
 public static class AesHelper
 {
     /// <summary>
-    /// AES ECB模式解密
+    ///     AES ECB模式解密
     /// </summary>
     /// <param name="key">密钥</param>
     /// <param name="encryptedData">加密数据</param>
@@ -22,11 +22,12 @@ public static class AesHelper
         aes.Key = key;
 
         using var decryptor = aes.CreateDecryptor();
+
         return decryptor.TransformFinalBlock(encryptedData, 0, encryptedData.Length);
     }
 
     /// <summary>
-    /// AES ECB模式解密字符串
+    ///     AES ECB模式解密字符串
     /// </summary>
     /// <param name="key">密钥</param>
     /// <param name="encryptedString">加密字符串</param>
@@ -35,6 +36,7 @@ public static class AesHelper
     {
         byte[] encryptedData = Encoding.UTF8.GetBytes(encryptedString);
         byte[] decryptedData = AesEcbDecrypt(key, encryptedData);
+
         return Encoding.UTF8.GetString(decryptedData);
     }
 }

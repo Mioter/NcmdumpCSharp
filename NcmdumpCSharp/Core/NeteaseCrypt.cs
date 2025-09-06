@@ -12,7 +12,7 @@ public class NeteaseCrypt : IDisposable
 {
     // 固定的密钥
     private static readonly byte[] _coreKey = "hzHRAmso5kInbaxW"u8.ToArray();
-    private static readonly byte[] _modifyKey = "#14ljk_!\\]&0U<\'("u8.ToArray();
+    private static readonly byte[] _modifyKey = "#14ljk_!\\]&0U<'("u8.ToArray();
     private static readonly byte[] _pngHeader = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
 
     private readonly string _filePath;
@@ -29,8 +29,15 @@ public class NeteaseCrypt : IDisposable
         Initialize();
     }
 
+    /// <summary>
+    ///     解析自 NCM 的元数据对象（标题、艺术家、专辑、格式等）。
+    ///     初始化时从 NCM 头读取；在解密首个音频块时如未确定 Format 将补全。
+    /// </summary>
     public NeteaseMusicMetadata? Metadata { get; private set; }
 
+    /// <summary>
+    ///     专辑封面二进制数据（JPEG 或 PNG），可在 <see cref="FixMetadata" /> 时写入音频标签。
+    /// </summary>
     public byte[]? ImageData { get; private set; }
 
     /// <summary>
@@ -208,7 +215,7 @@ public class NeteaseCrypt : IDisposable
     /// <summary>
     ///     获取MIME类型
     /// </summary>
-    private static string GetMimeType(byte[] data)
+    public static string GetMimeType(byte[] data)
     {
         if (data.Length >= 8 && data.Take(8).SequenceEqual(_pngHeader))
         {
@@ -219,10 +226,44 @@ public class NeteaseCrypt : IDisposable
     }
 
     /// <summary>
-    ///     解密并保存文件
+    ///     使用密钥盒对缓冲区执行 RC4 异或解密，并推进解密位置。
     /// </summary>
-    /// <param name="outputDir">输出目录</param>
-    public void Dump(string outputDir = "")
+    /// <param name="buffer">就地解密的数据缓冲区</param>
+    /// <param name="position">文件内偏移位置（将被按已处理字节数递增）</param>
+    private void Rc4Xor(Span<byte> buffer, ref long position)
+    {
+        for (int i = 0; i < buffer.Length; i++)
+        {
+            int j = (int)(position + i + 1 & 0xff);
+            buffer[i] ^= _keyBox[_keyBox[j] + _keyBox[_keyBox[j] + j & 0xff] & 0xff];
+        }
+
+        position += buffer.Length;
+    }
+
+    /// <summary>
+    ///     从首块数据前缀判断音频格式（mp3/flac），无法识别时返回 null。
+    /// </summary>
+    /// <param name="buffer">首块数据的只读切片</param>
+    /// <returns>文件扩展名（不含点），或 null</returns>
+    private static string? DetectFormat(ReadOnlySpan<byte> buffer)
+    {
+        return buffer.Length switch
+        {
+            // ID3 -> MP3
+            >= 3 when buffer[0] == 0x49 && buffer[1] == 0x44 && buffer[2] == 0x33 => "mp3",
+
+            // fLaC -> FLAC
+            >= 4 when buffer[0] == 0x66 && buffer[1] == 0x4C && buffer[2] == 0x61 && buffer[3] == 0x43 => "flac",
+            _ => null,
+        };
+    }
+
+    /// <summary>
+    ///     准备基础输出路径（不含扩展名），用于 Dump/DumpAsync。
+    /// </summary>
+    /// <param name="outputDir">可选的输出目录；为空时与源文件同目录</param>
+    private void PrepareDumpBasePath(string? outputDir)
     {
         if (string.IsNullOrEmpty(outputDir))
         {
@@ -233,52 +274,76 @@ public class NeteaseCrypt : IDisposable
             string fileName = Path.GetFileNameWithoutExtension(_filePath);
             DumpFilePath = Path.Combine(outputDir, fileName);
         }
+    }
+
+    /// <summary>
+    ///     对数据块做 RC4 解密，并在首个数据块时检测音频格式（设置 <see cref="NeteaseMusicMetadata.Format" />）。
+    /// </summary>
+    /// <param name="span">待就地解密的数据块</param>
+    /// <param name="position">文件内偏移位置（将被按已处理字节数递增）</param>
+    /// <param name="firstChunk">是否为首个数据块（调用内维护并在首次后置为 false）</param>
+    private void DecryptAndMaybeDetectFormat(Span<byte> span, ref long position, ref bool firstChunk)
+    {
+        Rc4Xor(span, ref position);
+
+        if (!firstChunk)
+            return;
+
+        if (string.IsNullOrEmpty(Metadata?.Format))
+        {
+            Metadata ??= new NeteaseMusicMetadata();
+            Metadata.Format = DetectFormat(span) ?? Metadata.Format;
+        }
+
+        firstChunk = false;
+    }
+
+    /// <summary>
+    ///     基于首块数据确定最终输出路径（含扩展名）并创建输出流。
+    /// </summary>
+    /// <param name="firstChunk">首块数据，用于格式检测</param>
+    /// <param name="useAsync">是否以异步写入模式打开文件流</param>
+    /// <returns>已创建的文件写入流</returns>
+    private FileStream CreateOutputStreamForFirstChunk(ReadOnlySpan<byte> firstChunk, bool useAsync)
+    {
+        string? fmt = DetectFormat(firstChunk);
+        DumpFilePath = Path.ChangeExtension(DumpFilePath, fmt ?? "flac");
+
+        string? outputDir2 = Path.GetDirectoryName(DumpFilePath);
+
+        if (!string.IsNullOrEmpty(outputDir2) && !Directory.Exists(outputDir2))
+        {
+            Directory.CreateDirectory(outputDir2);
+        }
+
+        return new FileStream(DumpFilePath, FileMode.Create, FileAccess.Write, FileShare.None, 0x8000, useAsync);
+    }
+
+    /// <summary>
+    ///     解密并将音频写入到文件（同步）。
+    /// </summary>
+    /// <param name="outputDir">可选的输出目录；为空时默认写入到源文件同目录</param>
+    public void Dump(string? outputDir = null)
+    {
+        PrepareDumpBasePath(outputDir);
 
         byte[] buffer = new byte[0x8000];
         FileStream? outputStream = null;
         long position = 0;
+        bool firstChunk = true;
 
         try
         {
-            while (_fileStream != null && _fileStream.Position < _fileStream.Length)
+            int bytesRead;
+
+            while (_fileStream != null && (bytesRead = _fileStream.Read(buffer, 0, buffer.Length)) > 0)
             {
-                int bytesRead = _fileStream.Read(buffer, 0, buffer.Length);
+                var span = buffer.AsSpan(0, bytesRead);
+                DecryptAndMaybeDetectFormat(span, ref position, ref firstChunk);
 
-                if (bytesRead == 0)
-                    break;
+                outputStream ??= CreateOutputStreamForFirstChunk(span, false);
 
-                // RC4解密
-                for (int i = 0; i < bytesRead; i++)
-                {
-                    int j = (int)(position + i + 1 & 0xff);
-                    buffer[i] ^= _keyBox[_keyBox[j] + _keyBox[_keyBox[j] + j & 0xff] & 0xff];
-                }
-
-                // 确定文件格式
-                if (outputStream == null)
-                {
-                    if (buffer[0] == 0x49 && buffer[1] == 0x44 && buffer[2] == 0x33)
-                    {
-                        DumpFilePath = Path.ChangeExtension(DumpFilePath, "mp3");
-                    }
-                    else
-                    {
-                        DumpFilePath = Path.ChangeExtension(DumpFilePath, "flac");
-                    }
-
-                    // 确保输出目录存在
-                    string? outputDir2 = Path.GetDirectoryName(DumpFilePath);
-
-                    if (!string.IsNullOrEmpty(outputDir2) && !Directory.Exists(outputDir2))
-                    {
-                        Directory.CreateDirectory(outputDir2);
-                    }
-
-                    outputStream = File.Create(DumpFilePath);
-                }
-
-                outputStream.Write(buffer, 0, bytesRead);
-                position += bytesRead;
+                outputStream.Write(span);
             }
         }
         finally
@@ -288,8 +353,9 @@ public class NeteaseCrypt : IDisposable
     }
 
     /// <summary>
-    ///     修复元数据
+    ///     修复输出音频文件的元数据（标题/艺术家/专辑/封面）。
     /// </summary>
+    /// <exception cref="InvalidOperationException">当输出文件不存在或路径为空时抛出</exception>
     public void FixMetadata()
     {
         if (string.IsNullOrEmpty(DumpFilePath) || !File.Exists(DumpFilePath))
@@ -325,9 +391,9 @@ public class NeteaseCrypt : IDisposable
     }
 
     /// <summary>
-    ///     解密音频数据到内存流
+    ///     解密音频数据到内存流（同步）。
     /// </summary>
-    /// <returns>包含解密后音频数据的内存流</returns>
+    /// <returns>包含解密后音频数据的内存流（Position 已重置为0）；当文件流未初始化时返回 null</returns>
     public MemoryStream? DumpToStream()
     {
         if (_fileStream == null)
@@ -338,41 +404,14 @@ public class NeteaseCrypt : IDisposable
         var memoryStream = new MemoryStream();
         byte[] buffer = new byte[0x8000];
         int bytesRead;
-        string? format = Metadata?.Format;
         bool firstChunk = true;
         long position = 0;
 
         while ((bytesRead = _fileStream.Read(buffer, 0, buffer.Length)) > 0)
         {
-            // RC4解密
-            for (int i = 0; i < bytesRead; i++)
-            {
-                int j = (int)(position + i + 1 & 0xff);
-                buffer[i] ^= _keyBox[_keyBox[j] + _keyBox[_keyBox[j] + j & 0xff] & 0xff];
-            }
-
-            if (firstChunk)
-            {
-                if (string.IsNullOrEmpty(format))
-                {
-                    Metadata ??= new NeteaseMusicMetadata();
-
-                    if (bytesRead >= 4)
-                    {
-                        Metadata.Format = buffer[0] switch
-                        {
-                            0x66 when buffer[1] == 0x4C && buffer[2] == 0x61 && buffer[3] == 0x43 => "flac",
-                            0x49 when buffer[1] == 0x44 && buffer[2] == 0x33 => "mp3",
-                            _ => Metadata.Format,
-                        };
-                    }
-                }
-
-                firstChunk = false;
-            }
-
-            memoryStream.Write(buffer, 0, bytesRead);
-            position += bytesRead;
+            var span = buffer.AsSpan(0, bytesRead);
+            DecryptAndMaybeDetectFormat(span, ref position, ref firstChunk);
+            memoryStream.Write(span);
         }
 
         memoryStream.Position = 0;
@@ -381,9 +420,9 @@ public class NeteaseCrypt : IDisposable
     }
 
     /// <summary>
-    ///     解密音频数据到内存流（异步版本）
+    ///     解密音频数据到内存流（异步）。
     /// </summary>
-    /// <returns>包含解密后音频数据的内存流</returns>
+    /// <returns>包含解密后音频数据的内存流（Position 已重置为0）；当文件流未初始化时返回 null</returns>
     public async Task<MemoryStream?> DumpToStreamAsync()
     {
         if (_fileStream == null)
@@ -394,45 +433,55 @@ public class NeteaseCrypt : IDisposable
         var memoryStream = new MemoryStream();
         byte[] buffer = new byte[0x8000];
         int bytesRead;
-        string? format = Metadata?.Format;
         bool firstChunk = true;
         long position = 0;
 
         while ((bytesRead = await _fileStream.ReadAsync(buffer)) > 0)
         {
-            // RC4解密
-            for (int i = 0; i < bytesRead; i++)
-            {
-                int j = (int)(position + i + 1 & 0xff);
-                buffer[i] ^= _keyBox[_keyBox[j] + _keyBox[_keyBox[j] + j & 0xff] & 0xff];
-            }
-
-            if (firstChunk)
-            {
-                if (string.IsNullOrEmpty(format))
-                {
-                    Metadata ??= new NeteaseMusicMetadata();
-
-                    Metadata.Format = bytesRead switch
-                    {
-                        // fLaC
-                        >= 4 when buffer[0] == 0x66 && buffer[1] == 0x4C && buffer[2] == 0x61 && buffer[3] == 0x43 => "flac",
-
-                        // ID3
-                        >= 3 when buffer[0] == 0x49 && buffer[1] == 0x44 && buffer[2] == 0x33 => "mp3",
-                        _ => Metadata.Format,
-                    };
-                }
-
-                firstChunk = false;
-            }
-
+            var span = buffer.AsSpan(0, bytesRead);
+            DecryptAndMaybeDetectFormat(span, ref position, ref firstChunk);
             await memoryStream.WriteAsync(buffer.AsMemory(0, bytesRead));
-            position += bytesRead;
         }
 
         memoryStream.Position = 0;
 
         return memoryStream;
+    }
+
+    /// <summary>
+    ///     解密并将音频写入到文件（异步）。
+    /// </summary>
+    /// <param name="outputDir">可选的输出目录；为空时默认写入到源文件同目录</param>
+    public async Task DumpAsync(string? outputDir = null)
+    {
+        PrepareDumpBasePath(outputDir);
+
+        byte[] buffer = new byte[0x8000];
+        FileStream? outputStream = null;
+        long position = 0;
+        bool firstChunk = true;
+
+        try
+        {
+            int bytesRead;
+
+            while (_fileStream != null && (bytesRead = await _fileStream.ReadAsync(buffer)) > 0)
+            {
+                var span = buffer.AsSpan(0, bytesRead);
+                DecryptAndMaybeDetectFormat(span, ref position, ref firstChunk);
+
+                outputStream ??= CreateOutputStreamForFirstChunk(span, true);
+
+                await outputStream.WriteAsync(buffer.AsMemory(0, bytesRead));
+            }
+        }
+        finally
+        {
+            if (outputStream is not null)
+            {
+                await outputStream.FlushAsync();
+                outputStream.Close();
+            }
+        }
     }
 }

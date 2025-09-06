@@ -106,7 +106,7 @@ public class NeteaseCrypt : IDisposable
                 modifyData[i] ^= 0x63;
             }
 
-            // 跳过"163 key(Don't modify):"
+            // 跳过"163 key(Don'\''t modify):"
             string swapModifyData = Encoding.UTF8.GetString(modifyData, 22, modifyData.Length - 22);
 
             // Base64解码
@@ -327,7 +327,63 @@ public class NeteaseCrypt : IDisposable
     /// <summary>
     ///     解密音频数据到内存流
     /// </summary>
-    /// <returns>包含音频流、元数据、封面图片和格式的元组</returns>
+    /// <returns>包含解密后音频数据的内存流</returns>
+    public MemoryStream? DumpToStream()
+    {
+        if (_fileStream == null)
+        {
+            return null;
+        }
+
+        var memoryStream = new MemoryStream();
+        byte[] buffer = new byte[0x8000];
+        int bytesRead;
+        string? format = Metadata?.Format;
+        bool firstChunk = true;
+        long position = 0;
+
+        while ((bytesRead = _fileStream.Read(buffer, 0, buffer.Length)) > 0)
+        {
+            // RC4解密
+            for (int i = 0; i < bytesRead; i++)
+            {
+                int j = (int)(position + i + 1 & 0xff);
+                buffer[i] ^= _keyBox[_keyBox[j] + _keyBox[_keyBox[j] + j & 0xff] & 0xff];
+            }
+
+            if (firstChunk)
+            {
+                if (string.IsNullOrEmpty(format))
+                {
+                    Metadata ??= new NeteaseMusicMetadata();
+
+                    if (bytesRead >= 4)
+                    {
+                        Metadata.Format = buffer[0] switch
+                        {
+                            0x66 when buffer[1] == 0x4C && buffer[2] == 0x61 && buffer[3] == 0x43 => "flac",
+                            0x49 when buffer[1] == 0x44 && buffer[2] == 0x33 => "mp3",
+                            _ => Metadata.Format,
+                        };
+                    }
+                }
+
+                firstChunk = false;
+            }
+
+            memoryStream.Write(buffer, 0, bytesRead);
+            position += bytesRead;
+        }
+
+        memoryStream.Position = 0;
+
+        return memoryStream;
+    }
+
+    /// <summary>
+    ///     解密音频数据到内存流（异步版本）
+    /// </summary>
+    /// <returns>包含解密后音频数据的内存流</returns>
     public async Task<MemoryStream?> DumpToStreamAsync()
     {
         if (_fileStream == null)
@@ -355,20 +411,17 @@ public class NeteaseCrypt : IDisposable
             {
                 if (string.IsNullOrEmpty(format))
                 {
-                    if (
-                        bytesRead >= 4
-                     && buffer[0] == 0x66
-                     && buffer[1] == 0x4C
-                     && buffer[2] == 0x61
-                     && buffer[3] == 0x43
-                    ) // fLaC
+                    Metadata ??= new NeteaseMusicMetadata();
+
+                    Metadata.Format = bytesRead switch
                     {
-                        Metadata?.Format = "flac";
-                    }
-                    else if (bytesRead >= 3 && buffer[0] == 0x49 && buffer[1] == 0x44 && buffer[2] == 0x33) // ID3
-                    {
-                        Metadata?.Format = "mp3";
-                    }
+                        // fLaC
+                        >= 4 when buffer[0] == 0x66 && buffer[1] == 0x4C && buffer[2] == 0x61 && buffer[3] == 0x43 => "flac",
+
+                        // ID3
+                        >= 3 when buffer[0] == 0x49 && buffer[1] == 0x44 && buffer[2] == 0x33 => "mp3",
+                        _ => Metadata.Format,
+                    };
                 }
 
                 firstChunk = false;
